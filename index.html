@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>乙女島 - Survival Sliders</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <div class="status-left">
+      <span class="label">ROUND</span> <span id="round">1</span>/7 
+      <span class="sep">|</span>
+      <span id="phaseLabel">EVENT</span>
+    </div>
+    <div class="status-right">
+      <span class="label">FOOD</span> <span id="food">2</span>
+      <button id="muteBtn" onclick="toggleMute()">🎵 ON</button>
+    </div>
+  </header>
+
+  <main id="phaseRoot">
+    <div id="phaseViewport">
+      <!-- Event Phase -->
+      <section id="eventPhase" class="phase active">
+        <div class="layout-container">
+          <section id="puzzle" class="puzzle"></section>
+          <section class="girls-sidebar">
+            <div id="girlsList" class="girls-flex"></div>
+          </section>
+        </div>
+      </section>
+
+      <!-- Dinner Phase -->
+      <section id="dinnerPhase" class="phase">
+        <div class="phase-center">
+          <div id="dinnerMessage" class="big-msg"></div>
+        </div>
+      </section>
+
+      <!-- Date Phase -->
+      <section id="datePhase" class="phase">
+        <div class="phase-center">
+          <div class="big-msg">💖 デートフェイズ</div>
+          <p>デートする相手を選んでください（最大1名）</p>
+          <div id="dateGirlList" class="girls-flex"></div>
+          <button class="action-btn" onclick="skipDate()">デートしない</button>
+        </div>
+      </section>
+
+      <!-- Kill Phase -->
+      <section id="killPhase" class="phase">
+        <div class="phase-center">
+          <div class="big-msg">🔪 殺戮フェイズ</div>
+          <div id="killDetail" class="sub-msg"></div>
+          <div id="killVisuals" class="girls-flex"></div>
+        </div>
+      </section>
+
+      <!-- Result Screen -->
+      <section id="resultPhase" class="phase">
+        <div class="phase-center">
+          <div id="resultBox" class="result-box">
+            <h1 id="resultTitle"></h1>
+            <p id="resultStat"></p>
+            <button class="action-btn" onclick="location.reload()">タイトルへ</button>
+            <button id="shareBtn" class="share-btn">Xで共有</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- 女の子選択モーダル (イベント/端数配分用) -->
+  <div id="girlModal" class="modal hidden">
+    <div class="modal-content">
+      <div id="modalTitle" class="modal-title"></div>
+      <div id="modalButtons" class="girls-flex"></div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
