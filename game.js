@@ -1,8 +1,8 @@
 /**
- * 乙女島 完全実装版
+ * 乙女島 - game.js (SE実装・モーダル横一列版)
  */
 
-// --- データ定義 ---
+// --- マスターデータ ---
 const GIRLS_INIT = [
   { id: "sakuma",  name: "佐久間さくら", skill: "housework", max: 6, atk: "left",  img: "メイド" },
   { id: "edomon",  name: "エドモン子",   skill: "power",     max: 4, atk: "left",  img: "メスゴリラ" },
@@ -12,31 +12,56 @@ const GIRLS_INIT = [
 ];
 
 const CHIP_DATA = {
-  wood:      { color: "green",  label: "木" },
-  vine:      { color: "green",  label: "蔦" },
-  saw:       { color: "green",  label: "のこぎり" },
-  berry:     { color: "pink",   label: "木の実" },
-  storm:     { color: "yellow", label: "嵐" },
-  hunting:   { color: "blue",   label: "狩り" },
-  housework: { color: "gray",   label: "家事" },
-  power:     { color: "gray",   label: "力仕事" }
+  wood: { color: "green", label: "木" },
+  vine: { color: "green", label: "蔦" },
+  saw:  { color: "green", label: "鋸" },
+  berry: { color: "pink", label: "実" },
+  storm: { color: "yellow", label: "嵐" },
+  hunting: { color: "blue", label: "狩" },
+  housework: { color: "gray", label: "家" },
+  power: { color: "gray", label: "力" }
 };
 
-// --- ゲーム状態 ---
+// --- 効果音の定義 ---
+const se = {
+  slide: new Audio('assets/sounds/se_slide.wav'),
+  clear: new Audio('assets/sounds/se_clear.wav'),
+  select: new Audio('assets/sounds/se_select.wav'),
+  food_up: new Audio('assets/sounds/se_food_up.wav'),
+  storm: new Audio('assets/sounds/se_storm.wav'),
+  attack: new Audio('assets/sounds/se_attack.wav'),
+  death: new Audio('assets/sounds/se_death.wav')
+};
+
+function playSE(key) {
+  if (state.isMuted) return;
+  if (se[key]) {
+    se[key].currentTime = 0; // 連続再生に対応
+    se[key].play().catch(() => {}); // ブラウザの自動再生制限対策
+  }
+}
+
 let state = {
-  round: 1,
-  food: 2,
-  phase: "event",
-  girls: [],
-  puzzle: [],
+  round: 1, food: 2, phase: "event",
+  girls: [], puzzle: [],
   flags: { berry: false, storm: false, housework: false, power: false },
   pendingChip: null,
+  dateRemainderTargets: [],
   isMuted: false
 };
 
-// --- 初期化 ---
+// --- ユーティリティ ---
+function shuffleArray(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
 function init() {
-  state.girls = GIRLS_INIT.map(g => ({ ...g, stress: g.max }));
+  const randomizedGirls = shuffleArray([...GIRLS_INIT]);
+  state.girls = randomizedGirls.map(g => ({ ...g, stress: g.max }));
   startRound();
 }
 
@@ -50,14 +75,14 @@ function initPuzzle() {
   const chips = Object.keys(CHIP_DATA);
   do {
     state.puzzle = chips.sort(() => Math.random() - 0.5).concat([null]);
-  } while (isPuzzleClear()); // 初期状態で揃っていたらやり直し
+  } while (isPuzzleClear());
 }
 
-// --- フェイズ制御 ---
 function setPhase(p) {
   state.phase = p;
   document.querySelectorAll('.phase').forEach(el => el.classList.remove('active'));
-  document.getElementById(p + 'Phase').classList.add('active');
+  const target = document.getElementById(p + 'Phase');
+  if(target) target.classList.add('active');
 
   if (p === "dinner") runDinner();
   if (p === "date") renderDate();
@@ -65,16 +90,29 @@ function setPhase(p) {
   render();
 }
 
-// --- イベントフェイズ (パズル) ---
+function notify(elementId, text, color = "#fff") {
+  const parent = document.getElementById(elementId);
+  if(!parent) return;
+  const el = document.createElement("div");
+  el.className = "floating-num";
+  el.textContent = text;
+  el.style.color = color;
+  parent.appendChild(el);
+  setTimeout(() => el.remove(), 1000);
+}
+
+// --- パズルロジック ---
 function moveTile(idx) {
   if (state.phase !== "event") return;
   const emptyIdx = state.puzzle.indexOf(null);
   const diff = Math.abs(idx - emptyIdx);
   if (diff === 1 || diff === 3) {
     [state.puzzle[idx], state.puzzle[emptyIdx]] = [state.puzzle[emptyIdx], state.puzzle[idx]];
+    playSE('slide'); // SE: スライド
     applyChipEffect(state.puzzle[emptyIdx]);
     render();
     if (isPuzzleClear()) {
+      playSE('clear'); // SE: パズル揃い
       setTimeout(() => setPhase("dinner"), 800);
     }
   }
@@ -82,57 +120,49 @@ function moveTile(idx) {
 
 function applyChipEffect(chip) {
   if (!chip) return;
-
-  // 動かすたびに何度でも：狩り
   if (chip === "hunting") {
     state.pendingChip = "hunting";
-    openGirlModal("作業する女の子を選択してください");
-    return;
-  }
-
-  // 1回だけ：木の実、嵐、家事、力仕事
-  if (state.flags[chip] === true) return; // 使用済みなら無視
-
-  if (chip === "berry") {
-    state.food += 1;
-    state.flags.berry = true;
-  } else if (chip === "storm") {
-    state.girls.forEach(g => g.stress--);
-    state.flags.storm = true;
-  } else if (chip === "housework" || chip === "power") {
-    state.pendingChip = chip;
-    openGirlModal(`${CHIP_DATA[chip].label}をする女の子を選択`);
+    openGirlModal("狩りをする女の子を選択");
+  } else if (!state.flags[chip]) {
+    if (chip === "berry") { 
+      state.food++; state.flags.berry = true;
+      playSE('food_up'); // SE: 食料増
+      notify("stat-food", "+1", "#7fff7f");
+    } else if (chip === "storm") { 
+      state.girls.forEach(g => g.stress--); state.flags.storm = true;
+      playSE('storm'); // SE: 嵐
+      notify("stat-round", "嵐!", "var(--yellow)");
+    } else if (chip === "housework" || chip === "power") {
+      state.pendingChip = chip;
+      openGirlModal(`${CHIP_DATA[chip].label}を行う女の子を選択`);
+    }
   }
 }
 
 function openGirlModal(title) {
+  const modal = document.getElementById("girlModal");
   document.getElementById("modalTitle").textContent = title;
   const grid = document.getElementById("modalButtons");
   grid.innerHTML = "";
-
   state.girls.forEach((g, i) => {
     const card = createGirlCard(g);
     if (g.skill === state.pendingChip) card.classList.add("match");
-    card.onclick = () => selectGirlForWork(i);
+    card.onclick = () => {
+      playSE('select'); // SE: 女の子決定
+      const cost = (g.skill === state.pendingChip) ? 1 : 2;
+      g.stress -= cost;
+      if (state.pendingChip === "hunting") {
+        state.food += 2; 
+        playSE('food_up'); // SE: 食料増(狩り)
+        notify("stat-food", "+2", "#7fff7f");
+      } else state.flags[state.pendingChip] = true;
+      state.pendingChip = null;
+      modal.classList.add("hidden");
+      render();
+    };
     grid.appendChild(card);
   });
-  document.getElementById("girlModal").classList.remove("hidden");
-}
-
-function selectGirlForWork(idx) {
-  const girl = state.girls[idx];
-  const cost = (girl.skill === state.pendingChip) ? 1 : 2;
-  girl.stress -= cost;
-
-  if (state.pendingChip === "hunting") {
-    state.food += 2;
-  } else {
-    state.flags[state.pendingChip] = true;
-  }
-
-  state.pendingChip = null;
-  document.getElementById("girlModal").classList.add("hidden");
-  render();
+  modal.classList.remove("hidden");
 }
 
 function isPuzzleClear() {
@@ -145,71 +175,64 @@ function isPuzzleClear() {
 // --- ディナーフェイズ ---
 function runDinner() {
   state.food -= 3;
+  notify("stat-food", "-3", "var(--red)");
   const msg = document.getElementById("dinnerMessage");
-  if (state.food < 0) {
-    state.girls.forEach(g => g.stress--);
-    state.food = 0;
-    msg.innerHTML = "🍴 食料が足りない！<br><small>全員のストレスが1減少しました</small>";
-  } else {
-    msg.textContent = "🍴 穏やかな夕食をとった。";
-  }
-  render();
-  setTimeout(() => setPhase("date"), 1500);
+  setTimeout(() => {
+    if (state.food < 0) {
+      state.girls.forEach(g => g.stress--);
+      state.food = 0;
+      msg.innerHTML = "<span style='color:var(--red)'>食料不足！</span><br><small>全員のストレスが1悪化した...</small>";
+    } else msg.textContent = "ディナーを終えました。";
+    render();
+    setTimeout(() => setPhase("date"), 1500);
+  }, 500);
 }
 
 // --- デートフェイズ ---
 function renderDate() {
-  if (state.girls.length <= 1) {
-    setTimeout(() => setPhase("kill"), 800);
-    return;
-  }
+  if (state.girls.length <= 1) { setTimeout(() => setPhase("kill"), 800); return; }
   const list = document.getElementById("dateGirlList");
   list.innerHTML = "";
   state.girls.forEach((g, i) => {
     const card = createGirlCard(g);
-    card.onclick = () => processDate(i);
+    card.onclick = () => {
+      playSE('select'); // SE: 選択
+      const recovery = g.max - g.stress;
+      g.stress = g.max;
+      const others = state.girls.filter((_, idx) => idx !== i);
+      const baseDmg = Math.floor(recovery / others.length);
+      const remainder = recovery % others.length;
+      others.forEach(og => og.stress -= baseDmg);
+      if (remainder > 0) {
+        state.dateRemainderTargets = [];
+        askRemainder(others, remainder);
+      } else setPhase("kill");
+    };
     list.appendChild(card);
   });
-}
-
-function processDate(idx) {
-  const girl = state.girls[idx];
-  const recovery = girl.max - girl.stress;
-  girl.stress = girl.max;
-
-  const others = state.girls.filter((_, i) => i !== idx);
-  const perPerson = Math.floor(recovery / others.length);
-  let remainder = recovery % others.length;
-
-  others.forEach(g => g.stress -= perPerson);
-
-  if (remainder > 0) {
-    askRemainder(others, remainder);
-  } else {
-    setPhase("kill");
-  }
 }
 
 function skipDate() { setPhase("kill"); }
 
 function askRemainder(candidates, amount) {
-  document.getElementById("modalTitle").textContent = `残りの不満(${amount})を誰に割り振りますか？`;
+  const modal = document.getElementById("girlModal");
+  document.getElementById("modalTitle").textContent = `不満の端数[残り:${amount}]を誰に振りますか？(1人1点まで)`;
   const grid = document.getElementById("modalButtons");
   grid.innerHTML = "";
   candidates.forEach(g => {
     const card = createGirlCard(g);
+    const selected = state.dateRemainderTargets.includes(g.id);
+    if (selected) card.style.opacity = "0.3";
     card.onclick = () => {
-      g.stress--;
-      amount--;
+      if (selected) return;
+      playSE('select'); // SE: 選択
+      g.stress--; state.dateRemainderTargets.push(g.id); amount--;
       if (amount > 0) askRemainder(candidates, amount);
-      else {
-        document.getElementById("girlModal").classList.add("hidden");
-        setPhase("kill");
-      }
+      else { modal.classList.add("hidden"); setPhase("kill"); }
     };
     grid.appendChild(card);
   });
-  document.getElementById("girlModal").classList.remove("hidden");
+  modal.classList.remove("hidden");
 }
 
 // --- 殺戮フェイズ ---
@@ -219,37 +242,33 @@ async function runKill() {
   while (i < state.girls.length) {
     renderKillVisuals();
     let girl = state.girls[i];
-    
     if (girl.stress < 0) {
-      detail.textContent = `${girl.name}のストレスが限界だ！`;
-      await sleep(1000);
-      
+      detail.innerHTML = `<span style='color:var(--red)'>${girl.name}が暴走！</span>`;
+      await new Promise(r => setTimeout(r, 1000));
       let targetIdx = (girl.atk === "left") ? i - 1 : i + 1;
       
       if (targetIdx >= 0 && targetIdx < state.girls.length) {
-        detail.textContent = `${girl.name}は隣の${state.girls[targetIdx].name}を殺害した...`;
+        detail.textContent = `${girl.name}が隣の${state.girls[targetIdx].name}を殺害した。`;
+        playSE('attack'); // SE: 殺戮発生
         state.girls.splice(targetIdx, 1);
+        playSE('death'); // SE: 消滅
         girl.stress += 2;
-        if (targetIdx < i) i--; // 自分が詰まった場合
-        continue; // ストレス再チェック
+        if (targetIdx < i) i--;
+        continue;
       } else {
-        detail.textContent = `${girl.name}は誰にもぶつけられず自滅した...`;
+        detail.textContent = `${girl.name}は誰にもぶつけられず自滅した。`;
+        playSE('death'); // SE: 自滅
         state.girls.splice(i, 1);
         continue;
       }
     }
     i++;
   }
-  
-  detail.textContent = "殺戮は終わった。";
-  await sleep(1000);
-  
+  renderKillVisuals();
+  await new Promise(r => setTimeout(r, 1000));
   if (state.girls.length === 0) endGame(false);
   else if (state.round >= 7) endGame(true);
-  else {
-    state.round++;
-    startRound();
-  }
+  else { state.round++; startRound(); }
 }
 
 function renderKillVisuals() {
@@ -258,38 +277,46 @@ function renderKillVisuals() {
   state.girls.forEach(g => v.appendChild(createGirlCard(g)));
 }
 
-// --- 共通描画 ---
+// --- 描画コア ---
 function render() {
   document.getElementById("round").textContent = state.round;
   document.getElementById("food").textContent = state.food;
   document.getElementById("phaseLabel").textContent = state.phase.toUpperCase();
 
   if (state.phase === "event") {
-    const p = document.getElementById("puzzle");
-    p.innerHTML = "";
+    const pEl = document.getElementById("puzzle");
+    pEl.innerHTML = "";
     state.puzzle.forEach((chip, i) => {
       const d = document.createElement("div");
       d.className = `cell ${chip ? CHIP_DATA[chip].color : 'empty'}`;
-      if (chip) d.textContent = CHIP_DATA[chip].label;
+      if (chip) {
+        const img = document.createElement("img");
+        img.src = `assets/chips/${chip}.png`;
+        img.onerror = () => { img.remove(); d.textContent = CHIP_DATA[chip].label; };
+        d.appendChild(img);
+      }
       d.onclick = () => moveTile(i);
-      p.appendChild(d);
+      pEl.appendChild(d);
     });
-
-    const l = document.getElementById("girlsList");
-    l.innerHTML = "";
-    state.girls.forEach(g => l.appendChild(createGirlCard(g)));
+    const gList = document.getElementById("girlsList");
+    gList.innerHTML = "";
+    state.girls.forEach(g => gList.appendChild(createGirlCard(g)));
   }
 }
 
 function createGirlCard(g) {
   const d = document.createElement("div");
   d.className = "girl-card";
-  const skillNames = { hunting: "狩り", housework: "家事", power: "力仕事" };
+  if (g.stress < 0) d.classList.add("critical");
   const arrow = g.atk === "left" ? "←" : "→";
+  const skillNames = { hunting: "狩り", housework: "家事", power: "腕力" };
   
   d.innerHTML = `
     <div class="atk-dir">${arrow}</div>
-    <img src="assets/girls/${g.id}.png" alt="${g.img}">
+    <div class="img-wrapper" style="width:100%; aspect-ratio:180/260; background:#333; border-radius:4px; overflow:hidden;">
+        <img src="assets/girls/${g.id}.png" style="width:100%; height:100%; object-fit:cover;" 
+             onerror="this.style.display='none';">
+    </div>
     <div class="girl-name">${g.name}</div>
     <div class="girl-skill">${skillNames[g.skill]}</div>
     <div class="girl-stress" style="color:${g.stress < 0 ? 'var(--red)' : '#fff'}">
@@ -299,8 +326,6 @@ function createGirlCard(g) {
   return d;
 }
 
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
 function toggleMute() {
   state.isMuted = !state.isMuted;
   document.getElementById("muteBtn").textContent = state.isMuted ? "🎵 OFF" : "🎵 ON";
@@ -309,14 +334,11 @@ function toggleMute() {
 function endGame(win) {
   setPhase("result");
   document.getElementById("resultTitle").textContent = win ? "SURVIVED" : "DEAD END";
-  document.getElementById("resultTitle").style.color = win ? "var(--green)" : "var(--red)";
-  document.getElementById("resultStat").textContent = win ? `${state.girls.length}人の女の子と生き残った！` : "全滅してしまった...";
-  
+  document.getElementById("resultStat").textContent = win ? `${state.girls.length}人と生還しました！` : "全滅しました。";
   document.getElementById("shareBtn").onclick = () => {
-    const txt = encodeURIComponent(`乙女島：${state.round}ラウンド目に${state.girls.length}人で${win ? '生還！':'全滅...'}`);
+    const txt = encodeURIComponent(`乙女島：${state.round}Rで${state.girls.length}人生還！`);
     window.open(`https://twitter.com/intent/tweet?text=${txt}`);
   };
 }
 
-// 開始
 init();

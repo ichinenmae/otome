@@ -8,13 +8,13 @@
 </head>
 <body>
   <header>
-    <div class="status-left">
-      <span class="label">ROUND</span> <span id="round">1</span>/7 
+    <div class="status-left" id="stat-round">
+      <span class="label">ROUND</span> <span id="round" class="val-node">1</span>/7 
       <span class="sep">|</span>
-      <span id="phaseLabel">EVENT</span>
+      <span id="phaseLabel" class="phase-name">EVENT</span>
     </div>
-    <div class="status-right">
-      <span class="label">FOOD</span> <span id="food">2</span>
+    <div class="status-right" id="stat-food">
+      <span class="label">FOOD</span> <span id="food" class="val-node">2</span>
       <button id="muteBtn" onclick="toggleMute()">🎵 ON</button>
     </div>
   </header>
@@ -24,17 +24,20 @@
       <!-- Event Phase -->
       <section id="eventPhase" class="phase active">
         <div class="layout-container">
-          <section id="puzzle" class="puzzle"></section>
-          <section class="girls-sidebar">
+          <div class="puzzle-area">
+            <div id="puzzle" class="puzzle-grid"></div>
+          </div>
+          <div class="girls-sidebar">
+            <div class="sidebar-title">SURVIVORS</div>
             <div id="girlsList" class="girls-flex"></div>
-          </section>
+          </div>
         </div>
       </section>
 
       <!-- Dinner Phase -->
       <section id="dinnerPhase" class="phase">
         <div class="phase-center">
-          <div id="dinnerMessage" class="big-msg"></div>
+          <div id="dinnerMessage" class="big-msg animate-pop"></div>
         </div>
       </section>
 
@@ -42,7 +45,7 @@
       <section id="datePhase" class="phase">
         <div class="phase-center">
           <div class="big-msg">💖 デートフェイズ</div>
-          <p>デートする相手を選んでください（最大1名）</p>
+          <p class="sub-instr">ストレスを解消する女の子を1人選んでください</p>
           <div id="dateGirlList" class="girls-flex"></div>
           <button class="action-btn" onclick="skipDate()">デートしない</button>
         </div>
@@ -57,21 +60,21 @@
         </div>
       </section>
 
-      <!-- Result Screen -->
+      <!-- Result Phase -->
       <section id="resultPhase" class="phase">
         <div class="phase-center">
-          <div id="resultBox" class="result-box">
+          <div class="result-box animate-pop">
             <h1 id="resultTitle"></h1>
             <p id="resultStat"></p>
             <button class="action-btn" onclick="location.reload()">タイトルへ</button>
-            <button id="shareBtn" class="share-btn">Xで共有</button>
+            <button id="shareBtn" class="share-btn">Xで結果をポスト</button>
           </div>
         </div>
       </section>
     </div>
   </main>
 
-  <!-- 女の子選択モーダル (イベント/端数配分用) -->
+  <!-- 汎用女の子選択モーダル -->
   <div id="girlModal" class="modal hidden">
     <div class="modal-content">
       <div id="modalTitle" class="modal-title"></div>

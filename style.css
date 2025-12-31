@@ -8,11 +8,12 @@
   --yellow: #7a6f2f;
   --gray: #555;
   --pink: #7a3a5a;
+  --header-h: 44px;
 }
 
 body {
   margin: 0;
-  font-family: sans-serif;
+  font-family: 'Hiragino Kaku Gothic ProN', sans-serif;
   background: var(--bg);
   color: var(--text);
   overflow: hidden;
@@ -20,59 +21,93 @@ body {
 }
 
 header {
-  height: 44px;
+  height: var(--header-h);
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 15px;
   background: #000;
-  border-bottom: 1px solid #333;
-  font-weight: bold;
+  border-bottom: 2px solid #333;
+  z-index: 100;
+  position: relative;
 }
 
-.label { color: #888; font-size: 12px; margin-right: 4px; }
+.label { color: #888; font-size: 11px; margin-right: 4px; }
+.val-node { font-weight: bold; font-size: 20px; color: #fff; transition: color 0.3s; }
+.phase-name { font-size: 16px; font-weight: bold; color: var(--yellow); }
 .sep { margin: 0 10px; color: #444; }
 
-/* レイアウト */
+/* フローティング演出用の親要素設定 */
+.status-left, .status-right, .girl-card { position: relative; }
+
+/* レイアウト構成 */
+#phaseRoot { height: calc(100vh - var(--header-h)); position: relative; }
+.phase { display: none; height: 100%; width: 100%; }
+.phase.active { display: block; }
+
 .layout-container {
-  display: flex;
-  flex-direction: row;
-  height: calc(100vh - 44px);
-  padding: 10px;
-  box-sizing: border-box;
-}
-
-.puzzle {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  width: 45vh; /* 画面高さに合わせてサイズ調整 */
-  margin-right: 20px;
+  grid-template-columns: 1.2fr 1fr;
+  height: 100%;
 }
 
-.cell {
-  aspect-ratio: 1;
-  background: #333;
-  border-radius: 8px;
-  cursor: pointer;
+.puzzle-area {
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
-  font-size: 12px;
-  text-align: center;
+  padding: 10px;
 }
+
+.puzzle-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 90%;
+  max-width: 360px;
+  aspect-ratio: 1;
+}
+
+.girls-sidebar {
+  background: #181818;
+  padding: 10px;
+  overflow-y: auto;
+  border-left: 2px solid #222;
+}
+
+.sidebar-title {
+  font-size: 11px;
+  color: #555;
+  text-align: center;
+  margin-bottom: 8px;
+  letter-spacing: 2px;
+}
+
+/* パズルセル */
+.cell {
+  aspect-ratio: 1;
+  background: #2a2a2a;
+  border-radius: 8px;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s, box-shadow 0.2s;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+}
+.cell:active { transform: scale(0.95); }
 .cell.empty { visibility: hidden; }
 .cell.green { background: var(--green); }
 .cell.pink { background: var(--pink); }
 .cell.blue { background: var(--blue); }
 .cell.gray { background: var(--gray); }
 .cell.yellow { background: var(--yellow); }
+.cell img { width: 85%; height: 85%; object-fit: contain; }
 
-/* 女の子カード */
+/* 女の子カード (180:260 = 9:13) */
 .girls-flex {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   justify-content: center;
   flex-wrap: wrap;
 }
@@ -82,79 +117,134 @@ header {
   background: var(--card);
   border-radius: 6px;
   padding: 6px;
-  position: relative;
   border: 2px solid transparent;
   text-align: center;
-}
-
-.girl-card.match { border-color: #7fff7f; box-shadow: 0 0 10px #7fff7f55; }
-.girl-card.target { animation: shake 0.3s; border-color: var(--red); }
-
-.atk-dir {
-  position: absolute;
-  top: 2px; left: 2px;
-  background: rgba(0,0,0,0.7);
-  padding: 2px 4px;
-  border-radius: 4px;
-  font-size: 12px;
+  transition: all 0.3s;
 }
 
 .girl-card img {
   width: 100%;
-  height: 60px;
+  aspect-ratio: 180 / 260;
   object-fit: cover;
-  background: #444;
+  background: #333;
   border-radius: 4px;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
-.girl-name { font-size: 10px; font-weight: bold; margin-bottom: 2px; }
-.girl-skill { font-size: 9px; color: #aaa; margin-bottom: 4px; }
-.girl-stress { font-size: 13px; font-weight: bold; }
+.girl-card.match { border-color: #7fff7f; box-shadow: 0 0 10px rgba(127,255,127,0.4); }
+.girl-card.target { animation: shake 0.3s; border-color: var(--red); }
+.girl-card.critical { animation: blink 0.5s infinite alternate; }
 
-/* フェイズ切替 */
-.phase { position: absolute; inset: 0; display: none; }
-.phase.active { display: flex; flex-direction: column; }
-
-.phase-center {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 20px;
+.atk-dir {
+  position: absolute;
+  top: 4px; left: 4px;
+  background: rgba(0,0,0,0.8);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #fff;
+  z-index: 10;
 }
 
-.big-msg { font-size: 32px; font-weight: bold; margin-bottom: 10px; }
-.sub-msg { font-size: 18px; color: #ccc; min-height: 1.5em; }
+.girl-name { font-size: 10px; font-weight: bold; white-space: nowrap; overflow: hidden; }
+.girl-skill { font-size: 9px; color: #888; margin: 2px 0; }
+.girl-stress { font-size: 14px; font-weight: 900; }
 
 /* モーダル */
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.85);
+  background: rgba(0,0,0,0.9);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  backdrop-filter: blur(4px);
 }
 .modal.hidden { display: none; }
 .modal-content {
   background: #222;
   padding: 20px;
   border-radius: 12px;
-  max-width: 90%;
+  width: 90%;
+  max-width: 500px;
+  border: 1px solid #444;
 }
-.modal-title { text-align: center; margin-bottom: 15px; font-size: 18px; }
 
-.action-btn {
-  background: #444; color: #fff; border: none; padding: 12px 24px;
-  border-radius: 6px; font-size: 16px; cursor: pointer; margin-top: 10px;
+/* 演出用アニメーション */
+.floating-num {
+  position: absolute;
+  font-weight: bold;
+  font-size: 24px;
+  pointer-events: none;
+  animation: floatUp 1s forwards;
+  z-index: 200;
+  text-shadow: 0 0 4px #000;
 }
-.share-btn { background: #1da1f2; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; margin-left: 10px; cursor: pointer; }
+
+@keyframes floatUp {
+  0% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(-50px); opacity: 0; }
+}
 
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-4px); }
   75% { transform: translateX(4px); }
+}
+
+@keyframes blink {
+  from { box-shadow: 0 0 0px var(--red); }
+  to { box-shadow: 0 0 15px var(--red); border-color: var(--red); }
+}
+
+.animate-pop { animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+@keyframes pop {
+  0% { transform: scale(0.5); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* フェイズテキスト等 */
+.phase-center { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.big-msg { font-size: 32px; font-weight: bold; margin-bottom: 20px; }
+.sub-msg { font-size: 18px; color: #aaa; min-height: 1.5em; }
+.sub-instr { color: var(--yellow); margin-bottom: 15px; font-size: 14px; }
+.action-btn { background: #444; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; }
+
+/* --- モーダル内のカードを横一列に並べるための追加設定 --- */
+
+/* モーダル内のカードコンテナの設定 */
+#modalButtons.girls-flex {
+  display: flex;
+  flex-wrap: nowrap;   /* 改行させない（横一列を強制） */
+  overflow-x: auto;    /* 画面からはみ出る場合は横スクロールを出す */
+  justify-content: flex-start; /* 左詰めで並べる（スクロールしやすくするため） */
+  padding: 20px;       /* 上下に少し余白を空ける */
+  gap: 15px;           /* カード同士の隙間 */
+  -webkit-overflow-scrolling: touch; /* スマホで滑らかにスクロールさせる */
+}
+
+/* もし画面内に収まる程度に人数が少ない場合は中央に寄せる */
+@media (min-width: 600px) {
+  #modalButtons.girls-flex {
+    justify-content: center;
+  }
+}
+
+/* 横スクロールバーのデザイン（細くして邪魔にならないようにする） */
+#modalButtons::-webkit-scrollbar {
+  height: 6px;
+}
+#modalButtons::-webkit-scrollbar-track {
+  background: #222;
+}
+#modalButtons::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 3px;
+}
+
+/* モーダル自体の幅を広げてカードを見やすくする */
+.modal-content {
+  width: 95% !important; /* 画面幅いっぱい近くまで広げる */
+  max-width: none !important; /* 横長のカード列に対応するため制限を解除 */
 }
